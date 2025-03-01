@@ -1,128 +1,96 @@
 # Health Monitoring System
 
-## Problem statement
+## 1. Introduction
 
-Modern systems now follow a very well-known architectural pattern known as
-microservices. Microservices refer to a group of small servers communicating to
-achieve a given task or group of tasks. Each service tends to work independently
-and communicate with another service whenever some calculation or information
-is needed and cannot be found locally. Since these services work independent from
-each other, the system is susceptible to partial failures when some services fail.
-Moreover, as services are free to be deployed on different machines and platforms
-and may not share the same computing resources, these resources need to be
-monitored. For example, storage disks may reach their capacities, CPUs may be
-highly utilized, memory may be highly utilized. Therefore, a health monitoring
-system is needed to monitor the health of the system services and the resources
-they may use. <br>
+The **Health Monitoring System** is designed to analyze and track patient health data using **Big Data technologies** such as **Apache Spark, Hadoop, Kafka, and NoSQL databases**. This system processes health records of **10,000 patients**, identifies trends in health parameters, and provides real-time insights to doctors while also collecting patient feedback for further analysis.
 
-The goal is to use the lambda architecture for our health
-monitor system. See the figure below:<br>
-![https://github.com/AmrMomtaz/Health-Monitoring-System/blob/main/images/lambda.png](https://github.com/AmrMomtaz/Health-Monitoring-System/blob/main/images/lambda.png)<br>
+## 2. Objectives
 
-* The data is persisted in the batch layer using HDFS commands initiated from the scheduler.
-* Then the data is processed regularly using map-reduce to generate batch views creating the serving layer.
-* For the speed layer, Spark jobs are initiated for new data generating realtime views.
-* The output of mapreduce and spark jobs are <b>PARQUET</b> files.
-* We've used <b>DuckDB</b> for both NOSQL databes for the serving layer and speed layer.
-* The scheduler handles initiating the mapreduce jobs periodically and expiring the realtime views.
+- Generate **10,000 patient profiles** with health parameters.
+- Process patient data using **Hadoop (MapReduce) and Apache Spark**.
+- Perform **statistical analysis** on patient health records.
+- Stream processed data to doctors via **Kafka**.
+- Store patient feedback in a **NoSQL database**.
+- Analyze feedback using **Machine Learning** for sentiment classification.
+- Implement **database sharding** for scalability.
 
-<b>Please note that you should have hadoop installed (single node or multi-node setup) and you should have $HADOOP_HOME and $HADOOP_CLASSPATH paths are set correctly. (you can follow this <a href = "https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-common/SingleCluster.html">link</a> for hadoop setup guide)</b>
+## 3. System Architecture
 
-## Micro-services 
+The system follows a **Lambda architecture**, which consists of three layers:
+1. **Batch Layer (Hadoop & MapReduce):** Processes historical patient data stored in HDFS.
+2. **Speed Layer (Apache Spark & Kafka):** Streams new patient data for real-time analysis.
+3. **Serving Layer (NoSQL Database & Dashboard):** Stores processed data and provides visualization.
 
-The mock microservices system is built in which
-services send health messages to a certain client server. The client server should
-receive these messages, catalog, and persist them on HDFS.
-![https://github.com/AmrMomtaz/Health-Monitoring-System/blob/main/images/microservices.png](https://github.com/AmrMomtaz/Health-Monitoring-System/blob/main/images/microservices.png)<br>
-* The health messages will be in JSON format. Each message contains the service
-name, timestamp, CPU utilization percentage, RAM total and free space in GBs,
-and Disk total and free space in GBs.<br>
-* The services will send messages to the Health Monitor system using the UDP
-protocol. Use port 3500 on the Health Monitor side. The message will simply
-contain the health message json string.<br>
+## 4. Implementation Details
 
-<b>Please Note:</b> In the next sections we've developed tha mapreduce jobs and spark jobs to work on CSV files.
-So you will find a script which converts the JSON file to CSV in mock_microservices directory. Finally the data should have
-the following form:<br>
-![[data](https://github.com/AmrMomtaz/Health-Monitoring-System/blob/main/images/data.png)](https://github.com/AmrMomtaz/Health-Monitoring-System/blob/main/images/data.png)
+### 4.1 Data Generation
+- **Tools Used:** Python (Faker Library)
+- **Generated Data:**
+  - Patient ID
+  - Name
+  - Age
+  - Blood Pressure (BP)
+  - Sugar Level
+  - Cholesterol
+  - Hemoglobin
+- **Storage:** HDFS (Hadoop Distributed File System)
 
-## MapReduce
+### 4.2 Data Processing
+- **Tools Used:** Apache Spark, Hadoop MapReduce
+- **Processing Steps:**
+  1. Load patient data from HDFS.
+  2. Compute **average values** for BP, Sugar, Cholesterol, and Hemoglobin.
+  3. Categorize patients into **risk groups**.
+  4. Store processed data in **HDFS**.
 
-The map reduce jobs will calculate the required statistics:
-* The mean CPU utilization for each service.
-* The mean Disk utilization for each service.
-* The mean RAM utilization for each service.
-* The peak of utilization for each resource for each service.
-* The count of health messages received for each service.<br>
+### 4.3 Real-Time Streaming
+- **Tools Used:** Apache Kafka
+- **Process:**
+  1. Processed data is **published to a Kafka topic**.
+  2. **Doctors subscribed to Kafka receive real-time updates**.
+  3. **Patients provide feedback** through a web interface.
 
-The map step of any map-reduce job processes each record
-individually producing a record or more as a result. The reduce step collects all
-records having a common attribute and produces one record summarizing,
-reducing, these records.<br>
-You can find the MapReduce.jar in the mapreduce directory. Run the mapreduce job using the following command.<br>
-```
-$HADOOP_HOME/bin/hadoop jar MapReduce.jar HealthMapReduce
-```
-<b>PLEASE NOTE:</b> You should create a /Input directory in HDFS and put the data in it.
-The data should be in .csv files as shown before. You will use the following commands
-to create new directory and to move the data to HDFS
-```
-$HADOOP_HOME/bin/hdfs dfs -mkdir <folder name>
-$HADOOP_HOME/bin/hdfs dfs -copyFromLocal <local file path>  <dest(present on hdfs)>
-```
-If you want to change the source code and create a new mapredeuce.jar file use the following commands:
-```
-To compile the code:
-$HADOOP_HOME/bin/hadoop com.sun.tools.javac.Main HealthMapReduce.java
-To create JAR file:
-jar cf MapReduce.jar HealthMapReduce*.class
-```
-Here is an example of a mapreduce job running:
-![https://github.com/AmrMomtaz/Health-Monitoring-System/blob/main/images/mapreduce.png](https://github.com/AmrMomtaz/Health-Monitoring-System/blob/main/images/mapreduce.png)<br>
+### 4.4 NoSQL Database for Feedback Storage
+- **Database Used:** MongoDB
+- **Data Structure:** `{"patient_id": "UUID", "feedback": "String"}`
 
-<b>IMPORTANT NOTES:</b>
-* The percision of queries is in minutes.
-* The mapreduce creates <b>5 PARQUET files</b> which are [year.parquet , mounth.parquet , day.parquet , hour.parquet , minute.parquet] 
-to make the queries faster and reduce query latency.
-* The mapreduce writes the parquet files in /Output directory in HDFS and everytime mapreduce job is initiated it overwrites them.
- Here is the mapreduce output:
-![https://github.com/AmrMomtaz/Health-Monitoring-System/blob/main/images/mapreduce_output.png](https://github.com/AmrMomtaz/Health-Monitoring-System/blob/main/images/mapreduce_output.png)
-* We use DuckDB to query the parquet files. (you will find the query code in the mapreduce directory)
+### 4.5 Feedback Sentiment Analysis
+- **Tools Used:** NLP (TextBlob, VADER)
+- **Process:**
+  1. **Analyze patient feedback** to determine sentiment (**Positive/Negative**).
+  2. Generate **trends on patient satisfaction**.
 
-## Spark
-* The spark job represents the real time view of the system.
-It listens to "Spark_data" folder for new inputs to start processing it immediatly.
-* When a query is made, it utilized both the realtime view and the batch view where the realtime view represents only the last hour and the batch view represents all the data since the beginning
-* While the mapreduce job is running, 2 spark jobs are being fired, the old one which has the data since the last mapreduce job and a new one that starts with the new mapreduce job.
-The query still uses the old spark job.
-* When the mapreduce job ends, the old spark job is deleted and the new spark job continues till the next mapreduce fire.
+### 4.6 Database Sharding
+- **Technique Used:** MongoDB Sharding
+- **Purpose:** Distributes patient records across multiple database nodes for **scalability**.
 
-### Spark files:
-* "SparkSession.py" the spark job execution code
-* "state.txt" it tells the schedular what is the state of the realtime view
-#### There are 3 possible states:
- * 0: the first spark job is running
- * 1: the second spark job is running
- * 2: both spark jobs are running "when the mapreduce job is in-progress".
- 
-### Output folders:
-* "MapReduceOutput" where the parquet files are downloaded locally from hadoop
-* "Spark_data" a folder where the spark jon listens to
-* "SparkOutput1"/"SparkOutput2" where the parquet files are added locally from spark jobs depending on which job is running.
-they are all added to spark folder.
-#### Make sure these folder exists under /spark/ directory.
+## 5. Dashboard & Visualization
+- **Tools Used:** Flask, D3.js, Grafana
+- **Features:**
+  - Display **patient health statistics** (graphs & charts)
+  - Show **real-time streaming data**
+  - Display **patient feedback trends**
 
-## Simulations:
-* "Spark/QueryAllData.py" is a script that fetches the needed data both the realtime and the batch views.
-* "Spark/Simulator.py"/"Spark/schedular.py" is used to simulate the working flow of the realtime view and the batch view:
-To start the simulation:
-* Start the hadoop server as mentioned above.
-* Start the spark job using the SparkSession.py script.
-* Run both the simulator.py and schedular.py scripts.
-* The simulator periodically adds the services files to "spark_data" folder where spark listens.
-* The schedular waits for a given time and then starts the mapreduce job and adjusts the spark jobs to work accordingly.
+## 6. Results & Discussion
+- Successfully **processed 10,000 patient records** using **Hadoop & Spark**.
+- Provided **real-time health insights to doctors** using **Kafka**.
+- Collected and **analyzed patient feedback using NLP**.
+- Implemented **scalable storage solutions** with **NoSQL and database sharding**.
 
-### Notes:
-* Make sure all paths are adjusted according to your working space
-* Make sure the mapreduce.jar exists in the same directory as the schedular.
-* Add Spark_data folder and adjust the path to it in the SparkSession.py script if needed.
+## 7. Future Enhancements
+- **Integration with Wearable Devices:** Collect real-time patient vitals.
+- **Predictive Analytics:** Use **Machine Learning** to predict health risks.
+- **Cloud Deployment:** Deploy the system on **AWS/Azure** for scalability.
+
+## 8. Conclusion
+This **Health Monitoring System** demonstrates how **Big Data technologies** can effectively process and analyze **large-scale health records**. By leveraging **Apache Spark, Hadoop, Kafka, and NoSQL databases**, the system provides **real-time health insights, patient feedback analysis, and scalable data storage solutions**.
+
+---
+
+## Technologies Used
+- **Big Data:** Hadoop, Apache Spark
+- **Real-time Streaming:** Apache Kafka
+- **Database:** MongoDB (NoSQL), HDFS
+- **Machine Learning:** NLP for Sentiment Analysis
+- **Visualization:** Flask, Grafana, D3.js
+
